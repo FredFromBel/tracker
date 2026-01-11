@@ -17,7 +17,21 @@ module.exports = async function (context, req) {
     }
 
     const days = Math.max(1, Math.min(60, Number(req.query.days ?? 7))); // clamp 1..60
-    const pk = String(req.query.partitionKey ?? "u_test"); // for now (we harden later)
+    function getUserPartitionKey(req) {
+  const header = req.headers["x-ms-client-principal"] || req.headers["X-MS-CLIENT-PRINCIPAL"];
+  if (!header) return null;
+  const decoded = JSON.parse(Buffer.from(header, "base64").toString("utf8"));
+  const userId = decoded?.userId;
+  if (!userId) return null;
+  return `u_${userId}`;
+}
+
+const pk = getUserPartitionKey(req);
+if (!pk) {
+  context.res = { status: 401, body: { ok: false, error: "Unauthorized (missing client principal)" } };
+  return;
+}
+
 
     const end = new Date(); // today UTC
     const start = new Date(end.getTime() - (days - 1) * 24 * 60 * 60 * 1000);

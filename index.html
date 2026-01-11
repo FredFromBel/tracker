@@ -356,6 +356,30 @@
           kpiScore.textContent = "";
         }
       }
+      function fillFormFromLast(itemsDesc) {
+  if (!Array.isArray(itemsDesc) || itemsDesc.length === 0) return;
+
+  const last = itemsDesc[0]; // API renvoie latest first
+
+  const setVal = (id, v) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (el.type === "checkbox") el.checked = !!v;
+    else if (v !== undefined && v !== null) el.value = v;
+  };
+
+  setVal("weightKg", last.WeightKg);
+  setVal("sleepPct", last.SleepPct);
+  setVal("dayScore", last.DayScore);
+  setVal("pushUps", last.PushUps);
+  setVal("squats", last.Squats);
+  setVal("barbellRows", last.BarbellRows);
+  setVal("rowerMin", last.RowerMin);
+  setVal("fasting231", last.Fasting231);
+  setVal("strength", last.Strength);
+  setVal("mealNotes", last.MealNotes);
+  setVal("notes", last.Notes);
+}
 
       async function loadList() {
         setStatus("Chargement…");
@@ -374,6 +398,8 @@
         // API returns latest first; build ASC for charts
         const itemsDesc = data.items;
         const itemsAsc = [...itemsDesc].reverse();
+        fillFormFromLast(itemsDesc);
+
 
         // Table
         for (const it of itemsDesc) {

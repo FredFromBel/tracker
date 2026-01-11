@@ -1,6 +1,18 @@
 {
   "routes": [
     {
+      "route": "/api/hello",
+      "allowedRoles": ["anonymous"]
+    },
+    {
+      "route": "/api/teststorage",
+      "allowedRoles": ["anonymous"]
+    },
+    {
+      "route": "/api/checkins",
+      "allowedRoles": ["anonymous"]
+    },
+    {
       "route": "/api/*",
       "allowedRoles": ["authenticated"]
     },

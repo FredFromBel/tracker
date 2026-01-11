@@ -2,15 +2,103 @@
 <html lang="fr">
   <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Clear365 – Tracker privé</title>
+    <style>
+      body { font-family: system-ui, Arial, sans-serif; margin: 24px; }
+      h1 { margin-bottom: 8px; }
+      .muted { color: #555; }
+      table { border-collapse: collapse; width: 100%; margin-top: 16px; }
+      th, td { border: 1px solid #ddd; padding: 8px; font-size: 14px; }
+      th { background: #f6f6f6; text-align: left; }
+      .right { text-align: right; }
+      .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+      input, button { padding: 8px; font-size: 14px; }
+      button { cursor: pointer; }
+      pre { background: #f6f6f6; padding: 12px; overflow: auto; }
+    </style>
   </head>
   <body>
     <h1>Tracker privé</h1>
-    <p>Si tu vois cette page après authentification, tout fonctionne.</p>
+    <p class="muted">Vue: 7 derniers jours (Table Storage). <a href="/.auth/logout">Logout</a></p>
 
-    <ul>
-      <li><a href="/.auth/me">Voir infos utilisateur</a></li>
-      <li><a href="/.auth/logout">Se déconnecter</a></li>
-    </ul>
+    <div class="row">
+      <label>PartitionKey:</label>
+      <input id="pk" value="u_test" style="min-width: 240px;" />
+      <button id="refresh">Rafraîchir</button>
+      <a href="/.auth/me">/.auth/me</a>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th class="right">Poids (kg)</th>
+          <th class="right">Sommeil (%)</th>
+          <th class="right">Pompes</th>
+          <th class="right">Squats</th>
+          <th class="right">Rows</th>
+          <th class="right">Rameur (min)</th>
+          <th class="right">Score /10</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody id="rows">
+        <tr><td colspan="9">Chargement…</td></tr>
+      </tbody>
+    </table>
+
+    <details style="margin-top:16px;">
+      <summary>Debug (réponse brute)</summary>
+      <pre id="raw"></pre>
+    </details>
+
+    <script>
+      async function load() {
+        const pk = document.getElementById("pk").value.trim();
+        const url = `/api/checkins?days=7&partitionKey=${encodeURIComponent(pk)}`;
+        const res = await fetch(url, { headers: { "Accept": "application/json" }});
+        const data = await res.json();
+
+        document.getElementById("raw").textContent = JSON.stringify(data, null, 2);
+
+        const tbody = document.getElementById("rows");
+        tbody.innerHTML = "";
+
+        if (!data.ok || !Array.isArray(data.items) || data.items.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="9">Aucune donnée</td></tr>`;
+          return;
+        }
+
+        for (const it of data.items) {
+          const date = it.Date || "";
+          const w = (it.WeightKg ?? "").toString();
+          const sleep = (it.SleepPct ?? "").toString();
+          const pu = (it.PushUps ?? "").toString();
+          const sq = (it.Squats ?? "").toString();
+          const br = (it.BarbellRows ?? "").toString();
+          const rm = (it.RowerMin ?? "").toString();
+          const ds = (it.DayScore ?? "").toString();
+          const notes = (it.Notes ?? "").toString();
+
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${date}</td>
+            <td class="right">${w}</td>
+            <td class="right">${sleep}</td>
+            <td class="right">${pu}</td>
+            <td class="right">${sq}</td>
+            <td class="right">${br}</td>
+            <td class="right">${rm}</td>
+            <td class="right">${ds}</td>
+            <td>${notes}</td>
+          `;
+          tbody.appendChild(tr);
+        }
+      }
+
+      document.getElementById("refresh").addEventListener("click", load);
+      load();
+    </script>
   </body>
 </html>

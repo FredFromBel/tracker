@@ -1,6 +1,5 @@
 const { TableClient } = require("@azure/data-tables");
 
-// Helper: yyyyMMdd
 function yyyymmdd(dateStr) {
   const d = new Date(dateStr);
   if (Number.isNaN(d.getTime())) return null;
@@ -8,6 +7,15 @@ function yyyymmdd(dateStr) {
   const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
   const dd = String(d.getUTCDate()).padStart(2, "0");
   return `${yyyy}${mm}${dd}`;
+}
+
+function getUserPartitionKey(req) {
+  const header = req.headers["x-ms-client-principal"] || req.headers["X-MS-CLIENT-PRINCIPAL"];
+  if (!header) return null;
+  const decoded = JSON.parse(Buffer.from(header, "base64").toString("utf8"));
+  const userId = decoded?.userId;
+  if (!userId) return null;
+  return `u_${userId}`;
 }
 
 module.exports = async function (context, req) {
@@ -18,12 +26,16 @@ module.exports = async function (context, req) {
       return;
     }
 
-    // Body expected (JSON)
+    const pk = getUserPartitionKey(req);
+    if (!pk) {
+      context.res = { status: 401, body: { ok: false, error: "Unauthorized (missing client principal)" } };
+      return;
+    }
+
     const b = req.body || {};
     const date = b.date; // "YYYY-MM-DD"
-    const pk = b.partitionKey; // e.g. "u_<yourObjectId>" (we will harden later)
-    if (!date || !pk) {
-      context.res = { status: 400, body: { ok: false, error: "Missing required fields: date, partitionKey" } };
+    if (!date) {
+      context.res = { status: 400, body: { ok: false, error: "Missing required field: date" } };
       return;
     }
 
@@ -35,7 +47,6 @@ module.exports = async function (context, req) {
 
     const client = TableClient.fromConnectionString(conn, "DailyCheckins");
 
-    // Build entity (replace allowed = "écraser")
     const entity = {
       partitionKey: pk,
       rowKey: rk,
@@ -48,18 +59,26 @@ module.exports = async function (context, req) {
       RowerMin: Number(b.rowerMin ?? 0),
       Strength: Boolean(b.strength ?? false),
       MealNotes: String(b.mealNotes ?? ""),
-      SleepPct: Number(b.sleepPct ?? 0),     // MyAir 0-100
-      EnergyScore: Number(b.energyScore ?? 0), // optional 1-5
-      StressScore: Number(b.stressScore ?? 0), // optional 1-5
-      DayScore: Number(b.dayScore ?? 0),       // 0-10
+      SleepPct: Number(b.sleepPct ?? 0),
+      EnergyScore: Number(b.energyScore ?? 0),
+      StressScore: Number(b.stressScore ?? 0),
+      DayScore: Number(b.dayScore ?? 0),
       Notes: String(b.notes ?? ""),
       UpdatedAtUtc: new Date().toISOString()
     };
 
     await client.upsertEntity(entity, "Replace");
 
-    context.res = { status: 200, headers: { "Content-Type": "application/json" }, body: { ok: true, partitionKey: pk, rowKey: rk } };
+    context.res = {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+      body: { ok: true, partitionKey: pk, rowKey: rk }
+    };
   } catch (e) {
-    context.res = { status: 500, headers: { "Content-Type": "application/json" }, body: { ok: false, error: e.message || String(e) } };
+    context.res = {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+      body: { ok: false, error: e.message || String(e) }
+    };
   }
 };
